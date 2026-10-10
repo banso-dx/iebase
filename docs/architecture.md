@@ -18,7 +18,16 @@ iOS は後日 SwiftUI（supabase-swift）で作るため、**業務ルールを 
 | `locations` | 保管場所。`parent_id` で「家 / 寝室 / クローゼット」の階層を表す。財布・バッグも場所 |
 | `items` | モノ本体。購入日・購入場所・購入方法・価格・期限・保証期限・JAN コード・ステータス |
 | `item_photos` | 写真（Storage `item-photos` バケットのパス） |
+| `location_layouts` | 保管場所の 3D 配置（1:1）。部屋は寸法、家具は部屋の左奥の床を原点とした位置・サイズ・向き（cm / 度） |
 | `data_sharing_consents` | データ利用への同意履歴（追記のみ）。`current_consents` ビューで最新状態を取る |
+
+## 3D ルーム
+
+- 「部屋」= `kind = 'room'` の保管場所に `location_layouts` を付けたもの。部屋の直下の保管場所が「家具」として 3D に並ぶ
+- 家具の中の引き出しなど、さらに下の階層のモノは、その家具の中身として集計する
+- Web は three.js（@react-three/fiber）で箱を手で配置する。家具名のラベルは drei の `Html` を使わず、
+  3D 座標を毎フレーム画面座標に変換した DOM で描く（React 19 で `Html` のアンマウント時にエラーが出るため）
+- iOS 版では RoomPlan（LiDAR）のスキャン結果の家具を同じテーブルに `source = 'roomplan'` で保存する想定
 
 ## 収益化に向けた設計上の注意
 

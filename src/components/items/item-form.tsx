@@ -28,12 +28,14 @@ export function ItemForm({
   userId,
   item,
   photos = [],
+  defaultLocationId,
   categories,
   locations,
 }: {
   userId: string
   item?: Tables<"items">
   photos?: ExistingPhoto[]
+  defaultLocationId?: string
   categories: Option[]
   locations: Option[]
 }) {
@@ -139,7 +141,7 @@ export function ItemForm({
             </NativeSelect>
           </Field>
           <Field label="保管場所" htmlFor="location_id">
-            <NativeSelect id="location_id" name="location_id" defaultValue={item?.location_id ?? ""}>
+            <NativeSelect id="location_id" name="location_id" defaultValue={item?.location_id ?? defaultLocationId ?? ""}>
               <option value="">未選択</option>
               {locations.map((l) => (
                 <option key={l.id} value={l.id}>

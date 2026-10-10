@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/supabase/server"
 
 export const metadata: Metadata = { title: "モノを登録" }
 
-export default async function NewItemPage() {
+export default async function NewItemPage({ searchParams }: PageProps<"/items/new">) {
+  const { location } = await searchParams
   const { supabase, user } = await requireUser()
   const [categories, locations] = await Promise.all([
     getCategories(supabase),
@@ -17,6 +18,7 @@ export default async function NewItemPage() {
       <h1 className="text-xl font-semibold">モノを登録</h1>
       <ItemForm
         userId={user.id}
+        defaultLocationId={typeof location === "string" ? location : undefined}
         categories={categories.map((c) => ({ id: c.id, label: c.name }))}
         locations={locations.map((l) => ({ id: l.id, label: l.path }))}
       />

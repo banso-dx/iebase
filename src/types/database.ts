@@ -103,6 +103,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"location_layouts": {
+                  Row: {
+                    "color": string | null,"created_at": string,"depth_cm": number,"elevation_cm": number,"height_cm": number,"location_id": string,"rotation_deg": number,"source": string,"updated_at": string,"user_id": string,"width_cm": number,"x_cm": number,"z_cm": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "color"?: string | null,"created_at"?: string,"depth_cm": number,"elevation_cm"?: number,"height_cm": number,"location_id": string,"rotation_deg"?: number,"source"?: string,"updated_at"?: string,"user_id"?: string,"width_cm": number,"x_cm"?: number,"z_cm"?: number
+                  }
+                  Update: {
+                    "color"?: string | null,"created_at"?: string,"depth_cm"?: number,"elevation_cm"?: number,"height_cm"?: number,"location_id"?: string,"rotation_deg"?: number,"source"?: string,"updated_at"?: string,"user_id"?: string,"width_cm"?: number,"x_cm"?: number,"z_cm"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "location_layouts_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: true
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"locations": {
                   Row: {
                     "created_at": string,"id": string,"kind": Database["public"]['Enums']["location_kind"],"name": string,"parent_id": string | null,"sort_order": number,"updated_at": string,"user_id": string
