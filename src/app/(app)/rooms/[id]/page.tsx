@@ -61,6 +61,7 @@ export default async function RoomPage({ params }: PageProps<"/rooms/[id]">) {
       id: i.id,
       name: i.name,
       quantity: i.quantity,
+      locationId: i.location_id!,
       furnitureId: i.location_id === id ? null : furnitureOf(i.location_id!),
       // 家具の中の引き出しなど、さらに細かい場所名
       subLocation: loc && loc.parent_id !== id && loc.id !== id ? loc.name : null,
@@ -83,6 +84,9 @@ export default async function RoomPage({ params }: PageProps<"/rooms/[id]">) {
       .map((l) => ({
         id: l.id,
         name: l.name,
+        kind: l.kind,
+        parentId: l.parent_id!,
+        layout: tree.layoutById.get(l.id) ?? null,
         furnitureId: f.id,
         depth: tree.ancestors(l.id).length - tree.ancestors(f.id).length,
         itemCount: tree.itemCount(l.id),

@@ -28,6 +28,13 @@ iOS は後日 SwiftUI（supabase-swift）で作るため、**業務ルールを 
 - 右パネルは図形の配置（X・Y・幅・奥行き…）と、DB 側の情報（名前・中のモノ一覧・登録）を同じ場所に並べる
 - 共通部品は `src/components/plan/`（`PlanCanvas`・`useLayoutEditor`・`editor-chrome`）。家（部屋の配置）と部屋（家具の配置）で同じものを使う
 
+## 高さ（正面図）とフォルダ
+
+- 部屋の画面で家具を選び「高さ」を押す（またはダブルクリック）と、その家具を正面から見た 2D 図になる
+- 家具の直下の段・引き出しは `location_layouts` に「家具の左端からの中心 `x_cm`・底からの高さ `elevation_cm`・`width_cm` × `height_cm`」で持つ。
+  画面では縦軸を下向きに使うので `toElevationCanvas` / `fromElevationCanvas`（`src/lib/rooms.ts`）で変換する
+- 保管場所は「家 › 部屋 › 棚 › 段 › モノ」のフォルダとして扱う。部屋の画面の左パネルと「保管場所」ページはフォルダツリー（`FolderTree`）
+
 ## 持ち物
 
 - 財布・バッグ・ポーチ（`kind` が `wallet` / `bag` / `pouch`）は家や部屋とは独立した「持ち物」として扱う（`src/lib/carry.ts`）

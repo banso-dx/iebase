@@ -18,11 +18,19 @@ export function useLayoutEditor<T extends { id: string; layout: Layout }>({
   items,
   enabled = true,
   normalize,
+  toStored,
+  rotatable = true,
 }: {
   items: T[]
   enabled?: boolean
   /** 変更後のレイアウトを補正する（部屋からはみ出さないようにする等） */
   normalize?: (next: Layout) => Partial<Layout>
+  /**
+   * 画面上の座標と保存する値が異なる場合の変換（正面図など）。
+   * 指定すると、変更後の画面上のレイアウト全体から保存する値を作る
+   */
+  toStored?: (layout: Layout) => Partial<Layout>
+  rotatable?: boolean
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [overrides, setOverrides] = useState<Record<string, Partial<Layout>>>({})
@@ -59,7 +67,9 @@ export function useLayoutEditor<T extends { id: string; layout: Layout }>({
     setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
     if (!save) return
     const entry = (pendingSave.current[id] ??= { patch: {} })
-    entry.patch = { ...entry.patch, ...patch }
+    const current = merged.find((i) => i.id === id)?.layout
+    entry.patch =
+      toStored && current ? { ...entry.patch, ...toStored({ ...current, ...patch }) } : { ...entry.patch, ...patch }
     clearTimeout(entry.timer)
     if (immediate) flush(id)
     else entry.timer = setTimeout(() => flush(id), SAVE_DELAY_MS)
@@ -113,6 +123,7 @@ export function useLayoutEditor<T extends { id: string; layout: Layout }>({
   }
 
   const rotate = (id: string) => {
+    if (!rotatable) return
     const item = merged.find((i) => i.id === id)
     if (item) commitChange(id, { rotation_deg: (item.layout.rotation_deg + 90) % 360 })
   }

@@ -35,6 +35,8 @@ type Props = {
   shapes: PlanShape[]
   /** 部屋の中を編集するとき、その部屋の寸法。図形はこの範囲から出られない（原点は左奥） */
   container?: { width_cm: number; depth_cm: number }
+  /** 寸法表示の見出し（正面図では「幅」「高さ」） */
+  containerLabels?: { width: string; depth: string }
   selectedId: string | null
   onSelect: (id: string | null) => void
   /** ドラッグ中の位置更新（保存しない） */
@@ -66,7 +68,16 @@ const COLORS = {
  * 真上から見た 2D の編集キャンバス（Figma 風の操作）。
  * ドラッグで移動・スマートガイドで吸着、ホイールでスクロール、⌘+ホイールでズーム
  */
-export function PlanCanvas({ shapes, container, selectedId, onSelect, onChange, onCommit, onOpen }: Props) {
+export function PlanCanvas({
+  shapes,
+  container,
+  containerLabels,
+  selectedId,
+  onSelect,
+  onChange,
+  onCommit,
+  onOpen,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [view, setView] = useState<View | null>(null)
@@ -310,6 +321,7 @@ export function PlanCanvas({ shapes, container, selectedId, onSelect, onChange, 
                 fontSize={px(11)}
                 fill="#7c6f60"
               >
+                {containerLabels ? `${containerLabels.width} ` : ""}
                 {container.width_cm} cm
               </text>
               <text
@@ -320,6 +332,7 @@ export function PlanCanvas({ shapes, container, selectedId, onSelect, onChange, 
                 fill="#7c6f60"
                 transform={`rotate(-90 ${-px(10)} ${container.depth_cm / 2})`}
               >
+                {containerLabels ? `${containerLabels.depth} ` : ""}
                 {container.depth_cm} cm
               </text>
             </g>

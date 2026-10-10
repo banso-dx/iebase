@@ -152,3 +152,51 @@ export function nextRoomPosition(existing: RoomRect[], size: { width_cm: number;
   if (!b) return { x_cm: Math.round(size.width_cm / 2), z_cm: Math.round(size.depth_cm / 2) }
   return { x_cm: Math.round(b.right + size.width_cm / 2), z_cm: Math.round(b.top + size.depth_cm / 2) }
 }
+
+// ---------------------------------------------------------------
+// 正面図（高さ）：家具の中の段・引き出しは、家具を正面から見た座標で持つ
+//   x_cm = 家具の左端からの中心位置、elevation_cm = 家具の底からの高さ、
+//   width_cm × height_cm が正面から見た大きさ（depth_cm は家具の奥行き）
+// 画面（PlanCanvas）では縦軸を下向きに使うため、z_cm に「上端からの中心位置」を入れて描く
+// ---------------------------------------------------------------
+
+/** 段のレイアウトを正面図の画面座標に変換する */
+export function toElevationCanvas(c: Layout, furnitureHeight: number): Layout {
+  return {
+    ...c,
+    z_cm: furnitureHeight - c.elevation_cm - c.height_cm / 2,
+    depth_cm: c.height_cm,
+    rotation_deg: 0,
+  }
+}
+
+/** 正面図の画面座標から、保存する段のレイアウトに戻す */
+export function fromElevationCanvas(canvas: Layout, furnitureHeight: number): Partial<Layout> {
+  return {
+    x_cm: Math.round(canvas.x_cm),
+    width_cm: Math.round(canvas.width_cm),
+    height_cm: Math.round(canvas.depth_cm),
+    elevation_cm: Math.max(0, Math.round(furnitureHeight - canvas.z_cm - canvas.depth_cm / 2)),
+  }
+}
+
+export const COMPARTMENT_PRESETS = {
+  shelf3: { label: "3段に分割", kind: "shelf", names: ["上段", "中段", "下段"] },
+  shelf2: { label: "2段に分割", kind: "shelf", names: ["上段", "下段"] },
+  drawer4: { label: "引き出し4つ", kind: "drawer", names: ["1段目", "2段目", "3段目", "4段目"] },
+} as const satisfies Record<string, { label: string; kind: Enums<"location_kind">; names: readonly string[] }>
+
+export type CompartmentPreset = keyof typeof COMPARTMENT_PRESETS
+
+/** 家具の高さを上から等分した段のレイアウト（names[0] が一番上） */
+export function splitEvenly(furniture: Pick<Layout, "width_cm" | "depth_cm" | "height_cm">, count: number) {
+  const h = furniture.height_cm / count
+  return Array.from({ length: count }, (_, i) => ({
+    x_cm: Math.round(furniture.width_cm / 2),
+    z_cm: Math.round(furniture.depth_cm / 2),
+    width_cm: furniture.width_cm,
+    depth_cm: furniture.depth_cm,
+    height_cm: Math.round(h),
+    elevation_cm: Math.round(furniture.height_cm - h * (i + 1)),
+  }))
+}

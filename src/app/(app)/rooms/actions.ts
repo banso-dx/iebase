@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import {
+  COMPARTMENT_PRESETS,
   DEFAULT_ROOM,
   FURNITURE_PRESETS,
+  splitEvenly,
+  type CompartmentPreset,
   footprint,
   nextRoomPosition,
   type Layout,
@@ -155,3 +158,78 @@ export async function removeFromLayout(locationId: string) {
   revalidatePath("/rooms", "layout")
 }
 
+
+// ---------------------------------------------------------------
+// 家具の中の段・引き出し（正面図）
+// ---------------------------------------------------------------
+
+async function getFurnitureLayout(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  furnitureId: string
+) {
+  const { data } = await supabase
+    .from("location_layouts")
+    .select("width_cm, depth_cm, height_cm")
+    .eq("location_id", furnitureId)
+    .single()
+  if (!data) throw new Error("家具が見つかりません")
+  return data
+}
+
+/** 家具を等分した段を作る（「3段に分割」など） */
+export async function addCompartments(furnitureId: string, preset: CompartmentPreset) {
+  const { supabase } = await requireUser()
+  const furniture = await getFurnitureLayout(supabase, furnitureId)
+  const { kind, names } = COMPARTMENT_PRESETS[preset]
+
+  const { data: created, error } = await supabase
+    .from("locations")
+    .insert(names.map((name, i) => ({ name, kind, parent_id: furnitureId, sort_order: i })))
+    .select("id, sort_order")
+  if (error || !created) throw new Error("段を作成できませんでした")
+
+  const layouts = splitEvenly(furniture, names.length)
+  const { error: layoutError } = await supabase.from("location_layouts").insert(
+    created.map((c) => ({ location_id: c.id, ...layouts[c.sort_order] }))
+  )
+  if (layoutError) throw new Error("段を作成できませんでした")
+  revalidatePath("/", "layout")
+}
+
+/** 段を1つ追加する（既存の場所を配置する場合は locationId を渡す） */
+export async function addCompartment(
+  furnitureId: string,
+  input: { name: string; kind: Enums<"location_kind"> } | { locationId: string }
+) {
+  const { supabase } = await requireUser()
+  const furniture = await getFurnitureLayout(supabase, furnitureId)
+
+  let locationId: string
+  if ("locationId" in input) {
+    locationId = input.locationId
+  } else {
+    const name = input.name.trim()
+    if (!name) return
+    const { data, error } = await supabase
+      .from("locations")
+      .insert({ name, kind: input.kind, parent_id: furnitureId })
+      .select("id")
+      .single()
+    if (error) throw new Error("追加できませんでした")
+    locationId = data.id
+  }
+
+  // 家具の下から 1/4 の高さで、幅いっぱいに置く（後から正面図で調整する）
+  const height = Math.max(1, Math.round(furniture.height_cm / 4))
+  const { error } = await supabase.from("location_layouts").upsert({
+    location_id: locationId,
+    x_cm: Math.round(furniture.width_cm / 2),
+    z_cm: Math.round(furniture.depth_cm / 2),
+    width_cm: furniture.width_cm,
+    depth_cm: furniture.depth_cm,
+    height_cm: height,
+    elevation_cm: 0,
+  })
+  if (error) throw new Error("追加できませんでした")
+  revalidatePath("/", "layout")
+}

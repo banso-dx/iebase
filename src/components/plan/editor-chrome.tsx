@@ -37,6 +37,7 @@ export function EditorShell({
 }
 
 export function EditorToolbar({
+  leading,
   previewing,
   onTogglePreview,
   canUndo,
@@ -44,6 +45,8 @@ export function EditorToolbar({
   onUndo,
   onRedo,
 }: {
+  /** 左側に置く要素（表示の切り替えなど） */
+  leading?: React.ReactNode
   previewing: boolean
   onTogglePreview: () => void
   canUndo: boolean
@@ -52,26 +55,29 @@ export function EditorToolbar({
   onRedo: () => void
 }) {
   return (
-    <div className="pointer-events-auto flex items-center gap-2">
-      {!previewing && (
-        <div className="flex rounded-lg border bg-background/95 p-0.5 shadow-sm">
-          <ToolButton label="元に戻す（⌘Z）" disabled={!canUndo} onClick={onUndo}>
-            <Undo2 className="size-3.5" />
-          </ToolButton>
-          <ToolButton label="やり直す（⇧⌘Z）" disabled={!canRedo} onClick={onRedo}>
-            <Redo2 className="size-3.5" />
-          </ToolButton>
-        </div>
-      )}
-      <Button
-        size="sm"
-        variant={previewing ? "outline" : "default"}
-        className="shadow-sm"
-        onClick={onTogglePreview}
-      >
-        {previewing ? <PenLine /> : <Box />}
-        {previewing ? "編集に戻る" : "3Dプレビュー"}
-      </Button>
+    <div className="flex w-full items-start gap-2">
+      {leading && <div className="pointer-events-auto mr-auto flex items-center gap-2">{leading}</div>}
+      <div className="pointer-events-auto ml-auto flex items-center gap-2">
+        {!previewing && (
+          <div className="flex rounded-lg border bg-background/95 p-0.5 shadow-sm">
+            <ToolButton label="元に戻す（⌘Z）" disabled={!canUndo} onClick={onUndo}>
+              <Undo2 className="size-3.5" />
+            </ToolButton>
+            <ToolButton label="やり直す（⇧⌘Z）" disabled={!canRedo} onClick={onRedo}>
+              <Redo2 className="size-3.5" />
+            </ToolButton>
+          </div>
+        )}
+        <Button
+          size="sm"
+          variant={previewing ? "outline" : "default"}
+          className="shadow-sm"
+          onClick={onTogglePreview}
+        >
+          {previewing ? <PenLine /> : <Box />}
+          {previewing ? "編集に戻る" : "3Dプレビュー"}
+        </Button>
+      </div>
     </div>
   )
 }
