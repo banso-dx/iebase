@@ -23,6 +23,8 @@ iOS は後日 SwiftUI（supabase-swift）で作るため、**業務ルールを 
 
 ## 3D ルーム
 
+- 階層は 家（`kind = 'home'`）→ 部屋（`kind = 'room'`）→ 家具 → 引き出しなど。すべて `locations.parent_id` の親子関係で表す
+- 画面は `/homes`（家一覧）→ `/homes/[id]`（部屋一覧）→ `/rooms/[id]`（3D）の順にたどる
 - 「部屋」= `kind = 'room'` の保管場所に `location_layouts` を付けたもの。部屋の直下の保管場所が「家具」として 3D に並ぶ
 - 家具の中の引き出しなど、さらに下の階層のモノは、その家具の中身として集計する
 - Web は three.js（@react-three/fiber）で箱を手で配置する。家具名のラベルは drei の `Html` を使わず、

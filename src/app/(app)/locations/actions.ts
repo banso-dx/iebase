@@ -22,3 +22,13 @@ export async function deleteLocation(locationId: string) {
   await supabase.from("locations").delete().eq("id", locationId)
   revalidatePath("/", "layout")
 }
+
+export async function renameLocation(locationId: string, name: string) {
+  const trimmed = name.trim()
+  if (!trimmed || trimmed.length > 100) throw new Error("名前は1〜100文字で入力してください")
+
+  const { supabase } = await requireUser()
+  const { error } = await supabase.from("locations").update({ name: trimmed }).eq("id", locationId)
+  if (error) throw new Error("名前を変更できませんでした")
+  revalidatePath("/", "layout")
+}

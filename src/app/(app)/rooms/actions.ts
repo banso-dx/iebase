@@ -11,17 +11,20 @@ const cm = (fd: FormData, key: string, fallback: number) => {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
-/** 部屋を作る。既存の場所（location_id）を指定した場合はその場所に寸法を付ける */
+/** 家の中に部屋を作る。既存の部屋（location_id）を指定した場合はその部屋に寸法を付けて家に移す */
 export async function createRoom(formData: FormData) {
   const { supabase } = await requireUser()
+  const homeId = String(formData.get("home_id") ?? "") || null
 
   let roomId = String(formData.get("location_id") ?? "")
-  if (!roomId) {
+  if (roomId) {
+    await supabase.from("locations").update({ parent_id: homeId }).eq("id", roomId)
+  } else {
     const name = String(formData.get("name") ?? "").trim()
     if (!name) return
     const { data, error } = await supabase
       .from("locations")
-      .insert({ name, kind: "room" })
+      .insert({ name, kind: "room", parent_id: homeId })
       .select("id")
       .single()
     if (error) throw new Error("部屋を作成できませんでした")

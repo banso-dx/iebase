@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronLeft } from "lucide-react"
+import { ChevronRight } from "lucide-react"
+import { EditableTitle } from "@/components/locations/editable-title"
 import { RoomEditor, type Furniture, type RoomItem } from "@/components/rooms/room-editor"
 import { firstPhotoPath, signPhotoPaths } from "@/lib/data/items"
 import { requireUser } from "@/lib/supabase/server"
@@ -76,13 +77,33 @@ export default async function RoomPage({ params }: PageProps<"/rooms/[id]">) {
     .filter((l) => !layoutById.has(l.id))
     .map((l) => ({ id: l.id, name: l.name }))
 
+  // 家 / 部屋 のパンくず（部屋より上の祖先）
+  const crumbs: { id: string; name: string; kind: string }[] = []
+  for (let cur = room.parent_id ? byId.get(room.parent_id) : undefined; cur && crumbs.length < 10; ) {
+    crumbs.unshift(cur)
+    cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Link href="/rooms" className="text-muted-foreground hover:text-foreground" aria-label="部屋一覧へ">
-          <ChevronLeft className="size-5" />
+      <nav aria-label="パンくず" className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/homes" className="hover:text-foreground">
+          家
         </Link>
-        <h1 className="text-xl font-semibold">{room.name}</h1>
+        {crumbs.map((c) => (
+          <span key={c.id} className="flex items-center gap-1">
+            <ChevronRight className="size-3.5" />
+            <Link
+              href={c.kind === "home" ? `/homes/${c.id}` : `/items?location=${c.id}`}
+              className="hover:text-foreground"
+            >
+              {c.name}
+            </Link>
+          </span>
+        ))}
+      </nav>
+      <div className="flex items-center gap-2">
+        <EditableTitle locationId={room.id} name={room.name} />
         <span className="text-sm text-muted-foreground">
           {roomLayout.width_cm / 100}m × {roomLayout.depth_cm / 100}m
         </span>

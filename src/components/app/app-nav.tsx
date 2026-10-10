@@ -2,19 +2,20 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Box, Home, Package, MapPin, Settings, type LucideIcon } from "lucide-react"
+import { Home, House, Package, MapPin, Settings, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
+const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; also?: string[] }[] = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/items", label: "モノ", icon: Package },
-  { href: "/rooms", label: "ルーム", icon: Box },
+  { href: "/homes", label: "家", icon: House, also: ["/rooms"] },
   { href: "/locations", label: "保管場所", icon: MapPin },
   { href: "/settings", label: "設定", icon: Settings },
 ]
 
-function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href)
+function isActive(pathname: string, { href, also = [] }: { href: string; also?: string[] }) {
+  if (href === "/") return pathname === "/"
+  return [href, ...also].some((p) => pathname.startsWith(p))
 }
 
 /** PC 用：ヘッダー内の横並びナビ */
@@ -23,16 +24,16 @@ export function HeaderNav() {
 
   return (
     <nav className="hidden items-center gap-1 md:flex">
-      {NAV_ITEMS.map(({ href, label }) => (
+      {NAV_ITEMS.map((item) => (
         <Link
-          key={href}
-          href={href}
+          key={item.href}
+          href={item.href}
           className={cn(
             "rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground",
-            isActive(pathname, href) && "bg-muted font-medium text-foreground"
+            isActive(pathname, item) && "bg-muted font-medium text-foreground"
           )}
         >
-          {label}
+          {item.label}
         </Link>
       ))}
     </nav>
@@ -49,17 +50,17 @@ export function TabBar() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       <ul className="grid grid-cols-5">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-          <li key={href}>
+        {NAV_ITEMS.map(({ icon: Icon, ...item }) => (
+          <li key={item.href}>
             <Link
-              href={href}
+              href={item.href}
               className={cn(
                 "flex flex-col items-center gap-0.5 py-2 text-[11px] text-muted-foreground",
-                isActive(pathname, href) && "text-primary"
+                isActive(pathname, item) && "text-primary"
               )}
             >
               <Icon className="size-5" />
-              {label}
+              {item.label}
             </Link>
           </li>
         ))}
