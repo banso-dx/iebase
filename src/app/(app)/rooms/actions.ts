@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { DEFAULT_ROOM, FURNITURE_PRESETS, footprint, type Layout } from "@/lib/rooms"
+import {
+  DEFAULT_ROOM,
+  FURNITURE_PRESETS,
+  footprint,
+  nextRoomPosition,
+  type Layout,
+} from "@/lib/rooms"
+import { getRoomRects } from "@/lib/data/locations"
 import { requireUser } from "@/lib/supabase/server"
 import type { Enums } from "@/types/database"
 
@@ -31,12 +38,17 @@ export async function createRoom(formData: FormData) {
     roomId = data.id
   }
 
-  const { error } = await supabase.from("location_layouts").upsert({
-    location_id: roomId,
+  const size = {
     width_cm: cm(formData, "width_cm", DEFAULT_ROOM.width),
     depth_cm: cm(formData, "depth_cm", DEFAULT_ROOM.depth),
     height_cm: cm(formData, "height_cm", DEFAULT_ROOM.height),
-  })
+  }
+  const position = homeId
+    ? nextRoomPosition(await getRoomRects(supabase, homeId, roomId), size)
+    : { x_cm: 0, z_cm: 0 }
+  const { error } = await supabase
+    .from("location_layouts")
+    .upsert({ location_id: roomId, ...size, ...position })
   if (error) throw new Error("部屋を作成できませんでした")
 
   revalidatePath("/", "layout")
@@ -142,3 +154,4 @@ export async function removeFromLayout(locationId: string) {
   await supabase.from("location_layouts").delete().eq("location_id", locationId)
   revalidatePath("/rooms", "layout")
 }
+

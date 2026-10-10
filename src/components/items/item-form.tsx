@@ -19,7 +19,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
-type Option = { id: string | number; label: string }
+type Option = { id: string | number; label: string; group?: "home" | "carry" }
 export type ExistingPhoto = { id: string; storage_path: string; url?: string }
 
 const ACCEPT = "image/jpeg,image/png,image/webp"
@@ -143,11 +143,23 @@ export function ItemForm({
           <Field label="保管場所" htmlFor="location_id">
             <NativeSelect id="location_id" name="location_id" defaultValue={item?.location_id ?? defaultLocationId ?? ""}>
               <option value="">未選択</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.label}
-                </option>
-              ))}
+              {(
+                [
+                  ["home", "家・部屋"],
+                  ["carry", "持ち物"],
+                ] as const
+              ).map(([group, label]) => {
+                const options = locations.filter((l) => (l.group ?? "home") === group)
+                return options.length === 0 ? null : (
+                  <optgroup key={group} label={label}>
+                    {options.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
             </NativeSelect>
           </Field>
           <Field label="ブランド・メーカー" htmlFor="brand">

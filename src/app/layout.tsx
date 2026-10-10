@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
+import { SITE_NAME, SITE_TAGLINE } from "@/lib/site"
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: { default: "kurabase", template: "%s | kurabase" },
-  description: "家にあるモノを、まるごと管理。",
+  title: { default: SITE_NAME, template: `%s | ${SITE_NAME}` },
+  description: SITE_TAGLINE,
 }
 
 export const viewport: Viewport = {

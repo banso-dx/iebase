@@ -174,7 +174,7 @@ isOneToOne: false
             [_ in never]: never
           }
           Enums: {
-            "consent_purpose": "anonymized_analytics"|"third_party_provision"|"resale_offers","item_condition": "new"|"like_new"|"good"|"fair"|"poor","item_status": "owned"|"listed"|"sold"|"disposed"|"given_away","location_kind": "home"|"room"|"closet"|"shelf"|"drawer"|"box"|"bag"|"wallet"|"other","purchase_channel": "store"|"online"|"gift"|"secondhand"|"other"
+            "consent_purpose": "anonymized_analytics"|"third_party_provision"|"resale_offers","item_condition": "new"|"like_new"|"good"|"fair"|"poor","item_status": "owned"|"listed"|"sold"|"disposed"|"given_away","location_kind": "home"|"room"|"closet"|"shelf"|"drawer"|"box"|"bag"|"wallet"|"other"|"pouch","purchase_channel": "store"|"online"|"gift"|"secondhand"|"other"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -294,7 +294,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "consent_purpose": ["anonymized_analytics", "third_party_provision", "resale_offers"],"item_condition": ["new", "like_new", "good", "fair", "poor"],"item_status": ["owned", "listed", "sold", "disposed", "given_away"],"location_kind": ["home", "room", "closet", "shelf", "drawer", "box", "bag", "wallet", "other"],"purchase_channel": ["store", "online", "gift", "secondhand", "other"]
+            "consent_purpose": ["anonymized_analytics", "third_party_provision", "resale_offers"],"item_condition": ["new", "like_new", "good", "fair", "poor"],"item_status": ["owned", "listed", "sold", "disposed", "given_away"],"location_kind": ["home", "room", "closet", "shelf", "drawer", "box", "bag", "wallet", "other", "pouch"],"purchase_channel": ["store", "online", "gift", "secondhand", "other"]
           }
         }
 } as const

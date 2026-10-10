@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, House, Package, MapPin, Settings, type LucideIcon } from "lucide-react"
+import { Home, House, Package, MapPin, Settings, Wallet, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; also?: string[] }[] = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/items", label: "モノ", icon: Package },
   { href: "/homes", label: "家", icon: House, also: ["/rooms"] },
+  { href: "/carry", label: "持ち物", icon: Wallet },
   { href: "/locations", label: "保管場所", icon: MapPin },
   { href: "/settings", label: "設定", icon: Settings },
 ]
@@ -49,7 +50,7 @@ export function TabBar() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-6">
         {NAV_ITEMS.map(({ icon: Icon, ...item }) => (
           <li key={item.href}>
             <Link

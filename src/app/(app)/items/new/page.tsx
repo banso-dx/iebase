@@ -20,7 +20,7 @@ export default async function NewItemPage({ searchParams }: PageProps<"/items/ne
         userId={user.id}
         defaultLocationId={typeof location === "string" ? location : undefined}
         categories={categories.map((c) => ({ id: c.id, label: c.name }))}
-        locations={locations.map((l) => ({ id: l.id, label: l.path }))}
+        locations={locations.map((l) => ({ id: l.id, label: l.path, group: l.group }))}
       />
     </div>
   )

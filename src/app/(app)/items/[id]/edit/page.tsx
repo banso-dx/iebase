@@ -28,7 +28,7 @@ export default async function EditItemPage({ params }: PageProps<"/items/[id]/ed
         item={item}
         photos={(photos ?? []).map((p) => ({ ...p, url: urls.get(p.storage_path) }))}
         categories={categories.map((c) => ({ id: c.id, label: c.name }))}
-        locations={locations.map((l) => ({ id: l.id, label: l.path }))}
+        locations={locations.map((l) => ({ id: l.id, label: l.path, group: l.group }))}
       />
     </div>
   )

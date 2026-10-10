@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Boxes } from "lucide-react"
 import { LoginForm } from "./login-form"
+import { SITE_NAME, SITE_TAGLINE } from "@/lib/site"
 
 export const metadata: Metadata = { title: "ログイン" }
 
@@ -12,8 +13,8 @@ export default function LoginPage() {
           <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Boxes className="size-6" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">kurabase</h1>
-          <p className="text-sm text-muted-foreground">家にあるモノを、まるごと管理。</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{SITE_NAME}</h1>
+          <p className="text-sm text-muted-foreground">{SITE_TAGLINE}</p>
         </div>
         <LoginForm />
       </div>

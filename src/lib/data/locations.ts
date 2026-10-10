@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isCarryKind } from "@/lib/carry"
 import type { Database, Tables } from "@/types/database"
 
 type Client = SupabaseClient<Database>
@@ -13,6 +14,20 @@ export async function getLocationTree(supabase: Client) {
     supabase.from("items").select("location_id, quantity").eq("status", "owned"),
   ])
   return new LocationTree(locations ?? [], layouts ?? [], items ?? [])
+}
+
+/** 家の中の、配置済みの部屋の位置とサイズ（excludeId の部屋は除く） */
+export async function getRoomRects(
+  supabase: Client,
+  homeId: string,
+  excludeId?: string
+) {
+  const { data } = await supabase
+    .from("locations")
+    .select("id, location_layouts(x_cm, z_cm, width_cm, depth_cm, rotation_deg)")
+    .eq("parent_id", homeId)
+    .eq("kind", "room")
+  return (data ?? []).flatMap((r) => (r.id !== excludeId && r.location_layouts ? [r.location_layouts] : []))
 }
 
 export class LocationTree {
@@ -73,6 +88,18 @@ export class LocationTree {
   /** 子孫も含めた所有中のモノの点数 */
   itemCount(id: string) {
     return this.descendants(id).reduce((n, l) => n + (this.directCount.get(l.id) ?? 0), 0)
+  }
+
+  /** 自分か祖先が財布・バッグなどの持ち物か */
+  isCarry(id: string) {
+    return this.ancestors(id).some((l) => isCarryKind(l.kind))
+  }
+
+  /** 持ち物の一番外側の入れ物（親が持ち物でないもの） */
+  carryRoots() {
+    return this.locations.filter(
+      (l) => isCarryKind(l.kind) && !(l.parent_id && this.isCarry(l.parent_id))
+    )
   }
 
   /** 部屋が属する家（祖先のうち kind = 'home' のもの） */

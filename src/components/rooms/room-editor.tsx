@@ -1,17 +1,24 @@
 "use client"
 
-import { useMemo, useRef, useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Eye, Package, Pencil, Plus, RotateCw, X } from "lucide-react"
+import { CornerDownRight, Package, Plus, Square } from "lucide-react"
 import { toast } from "sonner"
+import { addFurniture, placeLocation, removeFromLayout, updateLayout } from "@/app/(app)/rooms/actions"
 import {
-  addFurniture,
-  placeLocation,
-  removeFromLayout,
-  updateLayout,
-} from "@/app/(app)/rooms/actions"
+  EditorShell,
+  EditorToolbar,
+  LayerList,
+  LayoutProperties,
+  NameField,
+  PanelSection,
+  ShortcutHelp,
+  type LayerRow,
+} from "@/components/plan/editor-chrome"
+import { PlanCanvas } from "@/components/plan/plan-canvas"
+import { useLayoutEditor } from "@/components/plan/use-layout-editor"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,7 +31,11 @@ import type { Enums } from "@/types/database"
 // three.js はブラウザでのみ動かす
 const RoomScene = dynamic(() => import("./room-scene").then((m) => m.RoomScene), {
   ssr: false,
-  loading: () => <div className="flex size-full items-center justify-center text-sm text-muted-foreground">読み込み中…</div>,
+  loading: () => (
+    <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
+      読み込み中…
+    </div>
+  ),
 })
 
 export type Furniture = { id: string; name: string; kind: Enums<"location_kind">; layout: Layout }
@@ -36,23 +47,21 @@ export type RoomItem = {
   subLocation: string | null
   photoUrl?: string
 }
+/** 家具の中の引き出しなど、配置しない下位の保管場所 */
+export type SubLocation = { id: string; name: string; furnitureId: string; depth: number; itemCount: number }
 
 type Props = {
   room: { id: string; name: string; layout: Layout }
   furniture: Furniture[]
+  subLocations: SubLocation[]
   unplaced: { id: string; name: string }[]
   items: RoomItem[]
 }
 
-const SAVE_DELAY_MS = 400
-
-export function RoomEditor({ room, furniture, unplaced, items }: Props) {
+/** 部屋の中の配置エディタ。2D での編集が基本で、3D はプレビューのときだけ表示する */
+export function RoomEditor({ room, furniture, subLocations, unplaced, items }: Props) {
   const router = useRouter()
-  const [editing, setEditing] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  // 保存前の変更をサーバーの値に重ねて表示する
-  const [overrides, setOverrides] = useState<Record<string, Partial<Layout>>>({})
-  const pendingSave = useRef<Record<string, { timer?: ReturnType<typeof setTimeout>; patch: Partial<Layout> }>>({})
+  const [previewing, setPreviewing] = useState(false)
   const [, startTransition] = useTransition()
 
   const itemsByFurniture = useMemo(() => {
@@ -60,43 +69,19 @@ export function RoomEditor({ room, furniture, unplaced, items }: Props) {
     for (const item of items) map.set(item.furnitureId, [...(map.get(item.furnitureId) ?? []), item])
     return map
   }, [items])
+  const countOf = (id: string | null) => (itemsByFurniture.get(id) ?? []).reduce((n, i) => n + i.quantity, 0)
 
-  const merged = furniture.map((f) => ({
-    ...f,
-    layout: { ...f.layout, ...overrides[f.id] },
-    itemCount: (itemsByFurniture.get(f.id) ?? []).reduce((n, i) => n + i.quantity, 0),
-  }))
-  const selected = merged.find((f) => f.id === selectedId) ?? null
-
-  const flush = (id: string) => {
-    const entry = pendingSave.current[id]
-    if (!entry) return
-    clearTimeout(entry.timer)
-    delete pendingSave.current[id]
-    startTransition(async () => {
-      try {
-        await updateLayout(id, entry.patch)
-      } catch {
-        toast.error("配置を保存できませんでした")
-      }
-    })
-  }
-
-  const change = (id: string, patch: Partial<Layout>, { immediate = false } = {}) => {
-    setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
-    const entry = (pendingSave.current[id] ??= { patch: {} })
-    entry.patch = { ...entry.patch, ...patch }
-    clearTimeout(entry.timer)
-    if (immediate) flush(id)
-    else entry.timer = setTimeout(() => flush(id), SAVE_DELAY_MS)
-  }
-
-  /** サイズや向きを変えたら、はみ出さないよう位置も補正する */
-  const resize = (f: (typeof merged)[number], patch: Partial<Layout>) => {
-    const next = { ...f.layout, ...patch }
-    const { x, z } = clampToRoom(next.x_cm, next.z_cm, next, room.layout)
-    change(f.id, { ...patch, x_cm: x, z_cm: z })
-  }
+  const editor = useLayoutEditor({
+    items: furniture,
+    enabled: !previewing,
+    // 部屋からはみ出さないよう位置を補正する
+    normalize: (next) => {
+      const { x, z } = clampToRoom(next.x_cm, next.z_cm, next, room.layout)
+      return { x_cm: x, z_cm: z }
+    },
+  })
+  const { merged, selected, selectedId, setSelectedId } = editor
+  const shapes = merged.map((f) => ({ ...f, itemCount: countOf(f.id) }))
 
   const run = (fn: () => Promise<void>, message: string) =>
     startTransition(async () => {
@@ -108,142 +93,158 @@ export function RoomEditor({ room, furniture, unplaced, items }: Props) {
       }
     })
 
+  const layerRows: LayerRow[] = shapes.flatMap((f) => [
+    {
+      id: f.id,
+      name: f.name,
+      meta: `${f.itemCount}`,
+      icon: <Square className="size-3.5 shrink-0" fill={colorFor(f.kind, f.layout)} strokeWidth={1.5} />,
+    },
+    ...subLocations
+      .filter((s) => s.furnitureId === f.id)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        meta: `${s.itemCount}`,
+        depth: s.depth,
+        static: true,
+        icon: <CornerDownRight className="size-3 shrink-0" />,
+      })),
+  ])
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-      <div className="relative h-[55vh] min-h-80 overflow-hidden rounded-xl border lg:h-[calc(100vh-11rem)]">
-        <RoomScene
-          room={room.layout}
-          furniture={merged}
-          selectedId={selectedId}
-          editing={editing}
-          onSelect={setSelectedId}
-          onMove={(id, pos) => change(id, pos)}
-          onMoveEnd={(id) => flush(id)}
+    <EditorShell
+      toolbar={
+        <EditorToolbar
+          previewing={previewing}
+          onTogglePreview={() => setPreviewing((p) => !p)}
+          canUndo={editor.historySize.undo > 0}
+          canRedo={editor.historySize.redo > 0}
+          onUndo={editor.undo}
+          onRedo={editor.redo}
         />
-        <div className="absolute top-3 left-3 flex rounded-lg border bg-background/95 p-0.5 shadow-sm">
-          <ModeButton active={!editing} onClick={() => setEditing(false)} icon={Eye} label="見る" />
-          <ModeButton active={editing} onClick={() => setEditing(true)} icon={Pencil} label="配置を編集" />
-        </div>
-        {editing && (
-          <p className="absolute bottom-3 left-3 rounded-md bg-background/90 px-2 py-1 text-xs text-muted-foreground">
-            家具をドラッグして移動できます
-          </p>
-        )}
-      </div>
-
-      <aside className="space-y-4">
-        {selected ? (
-          <section className="space-y-3 rounded-xl border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <span className="size-3 rounded-sm" style={{ background: colorFor(selected.kind, selected.layout) }} />
-              <h2 className="flex-1 truncate font-semibold">{selected.name}</h2>
-              <Button variant="ghost" size="icon-sm" onClick={() => setSelectedId(null)} aria-label="閉じる">
-                <X />
-              </Button>
-            </div>
-
-            {editing ? (
-              <FurnitureSettings
-                furniture={selected}
-                onResize={(patch) => resize(selected, patch)}
-                onColor={(color) => change(selected.id, { color })}
-                onRemove={() => {
-                  if (!confirm(`「${selected.name}」を3Dから外しますか？保管場所と中のモノはそのまま残ります。`)) return
-                  setSelectedId(null)
-                  run(() => removeFromLayout(selected.id), "外せませんでした")
-                }}
-              />
-            ) : (
-              <ItemList
-                items={itemsByFurniture.get(selected.id) ?? []}
-                empty="まだ何も登録されていません"
-              />
-            )}
-            <Link
-              href={`/items/new?location=${selected.id}`}
-              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
-            >
-              <Plus />
-              ここにモノを登録
-            </Link>
-          </section>
-        ) : editing ? (
-          <AddFurniture
-            unplaced={unplaced}
-            onAdd={(name, kind) => run(() => addFurniture(room.id, { name, kind }), "追加できませんでした")}
-            onPlace={(id) => run(() => placeLocation(room.id, id), "配置できませんでした")}
-          />
+      }
+      canvas={
+        previewing ? (
+          <RoomScene room={room.layout} furniture={shapes} selectedId={selectedId} onSelect={setSelectedId} />
         ) : (
-          <section className="space-y-3 rounded-xl border bg-card p-4">
-            <h2 className="font-semibold">家具</h2>
-            {merged.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                「配置を編集」から、クローゼットや棚を置いてみましょう。
+          <PlanCanvas
+            container={room.layout}
+            shapes={shapes.map((f) => ({
+              id: f.id,
+              name: f.name,
+              sublabel: `${f.itemCount}点`,
+              layout: f.layout,
+              variant: "furniture",
+              kind: f.kind,
+            }))}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChange={(id, patch) => editor.apply(id, patch, { save: false })}
+            onCommit={editor.commitDrag}
+          />
+        )
+      }
+      layers={
+        <LayerList
+          title="家具"
+          rows={layerRows}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          empty="右のパネルから家具を追加しましょう"
+        />
+      }
+      panel={
+        selected ? (
+          <>
+            <PanelSection>
+              <NameField locationId={selected.id} name={selected.name} />
+              <p className="px-2 text-xs text-muted-foreground">
+                {LOCATION_KIND_LABELS[selected.kind]}・モノ {countOf(selected.id)}点
               </p>
-            ) : (
-              <ul className="space-y-1">
-                {merged.map((f) => (
-                  <li key={f.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(f.id)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-                    >
-                      <span className="size-3 rounded-sm" style={{ background: colorFor(f.kind, f.layout) }} />
-                      <span className="flex-1 truncate">{f.name}</span>
-                      <span className="text-xs text-muted-foreground">{f.itemCount}点</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {(itemsByFurniture.get(null)?.length ?? 0) > 0 && (
-              <div className="space-y-2 border-t pt-3">
-                <h3 className="text-sm font-medium text-muted-foreground">部屋に直接置いてあるモノ</h3>
-                <ItemList items={itemsByFurniture.get(null)!} empty="" />
-              </div>
-            )}
-          </section>
-        )}
-      </aside>
-    </div>
-  )
-}
+            </PanelSection>
 
-function ModeButton({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: typeof Eye
-  label: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs",
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-      )}
-    >
-      <Icon className="size-3.5" />
-      {label}
-    </button>
+            <PanelSection
+              title="中身"
+              action={
+                <Link href={`/items/new?location=${selected.id}`} className={buttonVariants({ size: "xs" })}>
+                  <Plus />
+                  登録
+                </Link>
+              }
+            >
+              <ItemList items={itemsByFurniture.get(selected.id) ?? []} empty="まだ何も登録されていません" />
+            </PanelSection>
+
+            {!previewing && (
+              <PanelSection title="配置">
+                <LayoutProperties
+                  layout={selected.layout}
+                  extras={["height", "elevation"]}
+                  onChange={(patch) => editor.commitChange(selected.id, patch)}
+                  onRotate={() => editor.rotate(selected.id)}
+                />
+                <div className="flex items-center gap-2 border-t pt-3">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    色
+                    <input
+                      type="color"
+                      value={colorFor(selected.kind, selected.layout)}
+                      onChange={(e) => editor.apply(selected.id, { color: e.target.value })}
+                      className="size-7 cursor-pointer rounded border bg-transparent"
+                    />
+                  </label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto text-destructive"
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          `「${selected.name}」を間取りから外しますか？保管場所と中のモノはそのまま残ります。`,
+                        )
+                      )
+                        return
+                      setSelectedId(null)
+                      run(() => removeFromLayout(selected.id), "外せませんでした")
+                    }}
+                  >
+                    間取りから外す
+                  </Button>
+                </div>
+              </PanelSection>
+            )}
+            <ShortcutHelp />
+          </>
+        ) : (
+          <>
+            <RoomSize room={room} onSaved={() => router.refresh()} />
+            <AddFurniture
+              unplaced={unplaced}
+              onAdd={(name, kind) => run(() => addFurniture(room.id, { name, kind }), "追加できませんでした")}
+              onPlace={(id) => run(() => placeLocation(room.id, id), "配置できませんでした")}
+            />
+            {(itemsByFurniture.get(null)?.length ?? 0) > 0 && (
+              <PanelSection title="部屋に直接置いてあるモノ">
+                <ItemList items={itemsByFurniture.get(null)!} empty="" />
+              </PanelSection>
+            )}
+            <ShortcutHelp />
+          </>
+        )
+      }
+    />
   )
 }
 
 function ItemList({ items, empty }: { items: RoomItem[]; empty: string }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>
   return (
-    <ul className="max-h-[40vh] space-y-1 overflow-y-auto">
+    <ul className="-mx-1.5 space-y-0.5">
       {items.map((i) => (
         <li key={i.id}>
           <Link href={`/items/${i.id}`} className="flex items-center gap-3 rounded-md p-1.5 hover:bg-muted">
-            <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+            <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
               {i.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- 署名付きURLのため next/image を使わない
                 <img src={i.photoUrl} alt="" className="size-full object-cover" />
@@ -256,7 +257,9 @@ function ItemList({ items, empty }: { items: RoomItem[]; empty: string }) {
                 {i.name}
                 {i.quantity > 1 && <span className="text-muted-foreground"> ×{i.quantity}</span>}
               </span>
-              {i.subLocation && <span className="block truncate text-xs text-muted-foreground">{i.subLocation}</span>}
+              {i.subLocation && (
+                <span className="block truncate text-xs text-muted-foreground">{i.subLocation}</span>
+              )}
             </span>
           </Link>
         </li>
@@ -265,69 +268,59 @@ function ItemList({ items, empty }: { items: RoomItem[]; empty: string }) {
   )
 }
 
-function FurnitureSettings({
-  furniture,
-  onResize,
-  onColor,
-  onRemove,
-}: {
-  furniture: Furniture
-  onResize: (patch: Partial<Layout>) => void
-  onColor: (color: string) => void
-  onRemove: () => void
-}) {
-  const l = furniture.layout
-  const fields: [keyof Layout, string][] = [
+function RoomSize({ room, onSaved }: { room: Props["room"]; onSaved: () => void }) {
+  const [pending, startTransition] = useTransition()
+  const fields = [
     ["width_cm", "幅"],
     ["depth_cm", "奥行き"],
-    ["height_cm", "高さ"],
-    ["elevation_cm", "床からの高さ"],
-  ]
+    ["height_cm", "天井高"],
+  ] as const
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        {fields.map(([key, label]) => (
-          <div key={key} className="space-y-1">
-            <Label htmlFor={key} className="text-xs">
-              {label}（cm）
-            </Label>
-            <Input
-              id={key}
-              type="number"
-              min={key === "elevation_cm" ? 0 : 1}
-              value={l[key] as number}
-              onChange={(e) => {
-                const n = Math.round(Number(e.target.value))
-                if (Number.isFinite(n) && n >= (key === "elevation_cm" ? 0 : 1)) onResize({ [key]: n })
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onResize({ rotation_deg: (l.rotation_deg + 90) % 360 })}
-        >
-          <RotateCw />
-          90°回転
+    <PanelSection title="部屋の広さ">
+      <form
+        className="space-y-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const fd = new FormData(e.currentTarget)
+          const patch = Object.fromEntries(fields.map(([k]) => [k, Math.round(Number(fd.get(k)))]))
+          if (Object.values(patch).some((v) => !Number.isFinite(v) || v < 50)) {
+            toast.error("50cm 以上で入力してください")
+            return
+          }
+          startTransition(async () => {
+            try {
+              await updateLayout(room.id, patch)
+              onSaved()
+            } catch {
+              toast.error("保存できませんでした")
+            }
+          })
+        }}
+      >
+        <div className="grid grid-cols-3 gap-2">
+          {fields.map(([key, label]) => (
+            <div key={key} className="space-y-1">
+              <Label htmlFor={`room-${key}`} className="text-xs text-muted-foreground">
+                {label}（cm）
+              </Label>
+              <Input
+                key={`${key}:${room.layout[key]}`}
+                id={`room-${key}`}
+                name={key}
+                type="number"
+                min={50}
+                defaultValue={room.layout[key]}
+                className="h-8 tabular-nums"
+              />
+            </div>
+          ))}
+        </div>
+        <Button type="submit" variant="outline" size="sm" disabled={pending}>
+          広さを保存
         </Button>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          色
-          <input
-            type="color"
-            value={colorFor(furniture.kind, l)}
-            onChange={(e) => onColor(e.target.value)}
-            className="size-7 cursor-pointer rounded border bg-transparent"
-          />
-        </label>
-        <Button variant="ghost" size="sm" className="ml-auto text-destructive" onClick={onRemove}>
-          3Dから外す
-        </Button>
-      </div>
-    </div>
+      </form>
+    </PanelSection>
   )
 }
 
@@ -341,8 +334,7 @@ function AddFurniture({
   onPlace: (id: string) => void
 }) {
   return (
-    <section className="space-y-4 rounded-xl border bg-card p-4">
-      <h2 className="font-semibold">家具を追加</h2>
+    <PanelSection title="家具を追加">
       <form
         className="space-y-2"
         onSubmit={(e) => {
@@ -352,7 +344,7 @@ function AddFurniture({
           e.currentTarget.reset()
         }}
       >
-        <Input name="name" placeholder="名前（例：白い本棚）" required maxLength={100} />
+        <Input name="name" placeholder="名前（例：白い本棚）" required maxLength={100} className="h-8" />
         <div className="flex gap-2">
           <NativeSelect name="kind" defaultValue="shelf" className="flex-1" aria-label="種類">
             {FURNITURE_KINDS.map((k) => (
@@ -361,7 +353,7 @@ function AddFurniture({
               </option>
             ))}
           </NativeSelect>
-          <Button type="submit">
+          <Button type="submit" size="sm">
             <Plus />
             追加
           </Button>
@@ -370,10 +362,10 @@ function AddFurniture({
 
       {unplaced.length > 0 && (
         <div className="space-y-2 border-t pt-3">
-          <h3 className="text-sm font-medium text-muted-foreground">この部屋の未配置の場所</h3>
+          <h4 className="text-xs font-medium text-muted-foreground">この部屋の未配置の場所</h4>
           <ul className="space-y-1">
             {unplaced.map((u) => (
-              <li key={u.id} className="flex items-center gap-2 text-sm">
+              <li key={u.id} className={cn("flex items-center gap-2 text-sm")}>
                 <span className="flex-1 truncate">{u.name}</span>
                 <Button variant="outline" size="xs" onClick={() => onPlace(u.id)}>
                   配置する
@@ -383,7 +375,6 @@ function AddFurniture({
           </ul>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">配置済みの家具をタップすると、サイズや向きを変えられます。</p>
-    </section>
+    </PanelSection>
   )
 }

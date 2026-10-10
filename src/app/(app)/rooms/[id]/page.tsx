@@ -2,8 +2,9 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { EditableTitle } from "@/components/locations/editable-title"
-import { RoomEditor, type Furniture, type RoomItem } from "@/components/rooms/room-editor"
+import { RoomEditor, type Furniture, type RoomItem, type SubLocation } from "@/components/rooms/room-editor"
 import { firstPhotoPath, signPhotoPaths } from "@/lib/data/items"
+import { getLocationTree } from "@/lib/data/locations"
 import { requireUser } from "@/lib/supabase/server"
 
 export async function generateMetadata({ params }: PageProps<"/rooms/[id]">) {
@@ -73,6 +74,21 @@ export default async function RoomPage({ params }: PageProps<"/rooms/[id]">) {
     const layout = layoutById.get(l.id)
     return layout ? [{ id: l.id, name: l.name, kind: l.kind, layout }] : []
   })
+  // 家具の中の引き出しなど（レイヤー一覧に入れ子で表示する）
+  const tree = await getLocationTree(supabase)
+  const subLocations: SubLocation[] = furniture.flatMap((f) =>
+    tree
+      .descendants(f.id)
+      .filter((l) => l.id !== f.id)
+      .map((l) => ({
+        id: l.id,
+        name: l.name,
+        furnitureId: f.id,
+        depth: tree.ancestors(l.id).length - tree.ancestors(f.id).length,
+        itemCount: tree.itemCount(l.id),
+      }))
+  )
+
   const unplaced = children
     .filter((l) => !layoutById.has(l.id))
     .map((l) => ({ id: l.id, name: l.name }))
@@ -85,8 +101,8 @@ export default async function RoomPage({ params }: PageProps<"/rooms/[id]">) {
   }
 
   return (
-    <div className="space-y-4">
-      <nav aria-label="パンくず" className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
         <Link href="/homes" className="hover:text-foreground">
           家
         </Link>
@@ -101,16 +117,13 @@ export default async function RoomPage({ params }: PageProps<"/rooms/[id]">) {
             </Link>
           </span>
         ))}
-      </nav>
-      <div className="flex items-center gap-2">
+        <ChevronRight className="size-3.5" />
         <EditableTitle locationId={room.id} name={room.name} />
-        <span className="text-sm text-muted-foreground">
-          {roomLayout.width_cm / 100}m × {roomLayout.depth_cm / 100}m
-        </span>
       </div>
       <RoomEditor
         room={{ id: room.id, name: room.name, layout: roomLayout }}
         furniture={furniture}
+        subLocations={subLocations}
         unplaced={unplaced}
         items={roomItems}
       />

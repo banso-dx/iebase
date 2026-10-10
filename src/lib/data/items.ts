@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isCarryKind } from "@/lib/carry"
 import type { Database, Tables } from "@/types/database"
 
 type Client = SupabaseClient<Database>
@@ -21,7 +22,7 @@ export function firstPhotoPath(photos: Pick<Tables<"item_photos">, "storage_path
   return [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path
 }
 
-/** 保管場所を「家 / 寝室 / クローゼット」形式のパス付きで返す */
+/** 保管場所を「家 / 寝室 / クローゼット」形式のパス付きで返す。group は家側か持ち物か */
 export async function getLocationOptions(supabase: Client) {
   const { data } = await supabase
     .from("locations")
@@ -39,8 +40,15 @@ export async function getLocationOptions(supabase: Client) {
     return `${pathOf(loc.parent_id, seen)} / ${loc.name}`
   }
 
+  const isCarry = (id: string, seen = new Set<string>()): boolean => {
+    const loc = byId.get(id)
+    if (!loc || seen.has(id)) return false
+    seen.add(id)
+    return isCarryKind(loc.kind) || (loc.parent_id ? isCarry(loc.parent_id, seen) : false)
+  }
+
   return locations
-    .map((l) => ({ ...l, path: pathOf(l.id) }))
+    .map((l) => ({ ...l, path: pathOf(l.id), group: isCarry(l.id) ? ("carry" as const) : ("home" as const) }))
     .sort((a, b) => a.path.localeCompare(b.path, "ja"))
 }
 

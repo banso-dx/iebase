@@ -33,6 +33,7 @@ export const LOCATION_KIND_LABELS: Record<Enums<"location_kind">, string> = {
   box: "収納ボックス",
   bag: "バッグ",
   wallet: "財布",
+  pouch: "ポーチ",
   other: "その他",
 }
 
