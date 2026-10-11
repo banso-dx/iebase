@@ -27,6 +27,7 @@ jobs:
       # PageProps / LayoutProps は next が生成する型なので、型チェックの前に生成する
       - run: npx next typegen
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
   migrations:
